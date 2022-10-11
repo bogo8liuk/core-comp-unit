@@ -1,10 +1,9 @@
 name:                core-comp-unit
 version:             0.1.0.0
-github:              "githubuser/core-comp-unit"
-license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2022 Author name here"
+github:              "bogo8liuk/core-comp-unit"
+license:             MIT
+author:              bogo8liuk
+copyright:           2022 bogo8liuk
 
 extra-source-files:
 - README.md

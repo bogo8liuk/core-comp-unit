@@ -233,8 +233,8 @@ stgSimplifier guts stgp = do
     liftIO $ stg2stg dflags modl stgp
 
 {- C-- code generation from Stg program. -}
-cmmGenCode :: CgGuts -> [StgTopBinding] -> CollectedCCs -> Ghc (Stream IO CmmGroup ())
-cmmGenCode guts stgp ccs = do
+fromStgToCmm :: CgGuts -> [StgTopBinding] -> CollectedCCs -> Ghc (Stream IO CmmGroup ())
+fromStgToCmm guts stgp ccs = do
     dflags <- getSessionDynFlags
     let modl = cg_module guts
     let tycons = cg_tycons guts
@@ -273,9 +273,9 @@ fromCmmTo HscAsm guts rawCmmpStream = do
     uniqSup <- liftIO $ mkSplitUniqSupply 'a'
     dflags <- getSessionDynFlags
     name <- getModlName guts
-    liftIO $ writeAsmFile dflags name guts uniqSup rawCmmpStream
+    liftIO $ writeAsmFile dflags name uniqSup rawCmmpStream
     where
-        writeAsmFile dflags name guts uniqSup stream = do
+        writeAsmFile dflags name uniqSup stream = do
             handle <- openFile (name ++ ".asm") WriteMode
             nativeCodeGen dflags (cg_module guts) (mkModLoc name) handle uniqSup stream
 fromCmmTo HscLlvm guts rawCmmpStream = do
@@ -287,7 +287,7 @@ fromCmmTo HscLlvm guts rawCmmpStream = do
             handle <- openFile (name ++ ".ll") WriteMode
             llvmCodeGen dflags handle stream
 {- In the case of the target is bytecode (HscInterpreted) or there is no code-gen (HscNothing), what happens
-is just the evaluation of the stream and nothing more, no action is runned. -}
+is just the evaluation of the stream and nothing more, no action is run. -}
 fromCmmTo _ _ rawCmmpStream = do
     (_, srts) <- liftIO $ collect_ rawCmmpStream
     return srts
@@ -327,7 +327,7 @@ coreCompUnit name trgOpt linkOpt cp tyCons insts =
                 smplStgp <- stgSimplifier prepGuts stgp
 
                 {- C-- code generation. -}
-                cmmpStream <- cmmGenCode prepGuts smplStgp ccs
+                cmmpStream <- fromStgToCmm prepGuts smplStgp ccs
 
                 {- C-- code optimization ad then preparing for code generation. -}
                 optCmmStream <- cmmOptimizer prepGuts cmmpStream

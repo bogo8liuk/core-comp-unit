@@ -13,7 +13,6 @@ import Data.Time.Clock
 import GHC.Paths(libdir)
 import GHC
 import HscTypes
-import SrcLoc()
 import RdrName
 import InstEnv
 import FamInstEnv

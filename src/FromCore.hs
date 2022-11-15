@@ -18,7 +18,6 @@ import InstEnv
 import FamInstEnv
 import CostCentre
 import Rules
-import Module
 import Stream hiding (liftIO)
 import UniqSupply
 import CoreSyn
@@ -169,10 +168,6 @@ mkSumm dflags modl modLoc =
         , ms_hspp_buf = Nothing
         }
 
-{- TODO: `mainUnitId` represents the identifier for the instantiated library for the current program (the main). -}
-mkModl :: ModuleName -> Ghc Module
-mkModl modName = return $ mkModule mainUnitId modName
-
 fetchModlName :: Module -> String
 fetchModlName = moduleNameString . moduleName
 
@@ -292,8 +287,8 @@ fromCmmTo _ _ rawCmmpStream = do
     return srts
 
 {- TODO: see CoreLint which just type-checks a Core program (which is naive, since Core has explicit typing). -}
-coreCompUnit :: String -> HscTarget -> GhcLink -> CoreProgram -> [TyCon] -> [ClsInst] -> IO ()
-coreCompUnit name trgOpt linkOpt cp tyCons insts =
+coreCompUnit :: Module -> HscTarget -> GhcLink -> CoreProgram -> [TyCon] -> [ClsInst] -> IO ()
+coreCompUnit modl trgOpt linkOpt cp tyCons insts =
     case checkTrgLink trgOpt linkOpt of
         Just err -> do
             print err
@@ -306,8 +301,7 @@ coreCompUnit name trgOpt linkOpt cp tyCons insts =
                     , ghcLink = linkOpt
                     }
 
-                let modName = mkModuleName name
-                modl <- mkModl modName
+                let modName = moduleName modl
                 setTargets [mkTarget modName trgOpt]
 
                 {- Running the core-to-core pipeline. -}

@@ -270,7 +270,7 @@ fromCmmTo HscAsm guts rawCmmpStream = do
     liftIO $ writeAsmFile dflags name uniqSup rawCmmpStream
     where
         writeAsmFile dflags name uniqSup stream = do
-            handle <- openFile (name ++ ".asm") WriteMode
+            handle <- openFile (name ++ ".s") WriteMode
             nativeCodeGen dflags (cg_module guts) (mkModLoc name) handle uniqSup stream
 fromCmmTo HscLlvm guts rawCmmpStream = do
     dflags <- getSessionDynFlags

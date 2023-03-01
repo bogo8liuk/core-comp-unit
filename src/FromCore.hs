@@ -25,6 +25,8 @@ import CoreOpt
 import SimplCore
 import TidyPgm
 import CorePrep
+import CoreMonad
+import CoreLint
 import CoreToStg
 import StgSyn
 import SimplStg
@@ -197,6 +199,13 @@ coreTidy :: ModGuts -> Ghc (CgGuts, ModDetails)
 coreTidy guts = do
     env <- getSession
     liftIO $ tidyProgram env guts
+
+{- The core type-checker. It is not mandatory to include it in the backend pipeline, but it is useful to grant not
+to have seg faults afterwards. -}
+coreLint :: CoreToDo -> CoreProgram -> Ghc ()
+coreLint todo cp = do
+    env <- getSession
+    liftIO $ lintPassResult env todo cp
 
 {- It prepares a Core program for Stg code generation. -}
 corePrepare :: CgGuts -> Ghc (CgGuts, Set CostCentre)

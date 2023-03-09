@@ -13,6 +13,7 @@ import Data.Time.Clock
 import GHC.Paths(libdir)
 import GHC
 import HscTypes
+import PrelNames
 import RdrName
 import InstEnv
 import FamInstEnv
@@ -39,6 +40,7 @@ import CmmInfo
 import PprC
 import AsmCodeGen
 import LlvmCodeGen
+import BinIface
 
 data TargetLinkOptsErr =
       InterReqInMem
@@ -173,8 +175,8 @@ mkSumm dflags modl modLoc =
 fetchModlName :: Module -> String
 fetchModlName = moduleNameString . moduleName
 
-getModlName :: CgGuts -> Ghc String
-getModlName guts = return . fetchModlName $ cg_module guts
+getModlNameFrom :: CgGuts -> Ghc String
+getModlNameFrom guts = return . fetchModlName $ cg_module guts
 
 {- This is part of the core-to-core pipeline: it makes just the first simple optimizations on a Core program. -}
 coreSimplifier :: ModGuts -> Ghc ModGuts
@@ -212,7 +214,7 @@ corePrepare :: CgGuts -> Ghc (CgGuts, Set CostCentre)
 corePrepare guts = do
     dflags <- getSessionDynFlags
     env <- getSession
-    name <- getModlName guts
+    name <- getModlNameFrom guts
     let modLoc = mkModLoc name
     let modl = cg_module guts
     let summ = mkSumm dflags modl modLoc
@@ -262,7 +264,7 @@ fromCmmTo :: HscTarget -> CgGuts -> Stream IO RawCmmGroup ModuleSRTInfo -> Ghc M
 fromCmmTo HscC guts rawCmmpStream = do
     (cmmProg, srts) <- liftIO $ collect_ rawCmmpStream
     dflags <- getSessionDynFlags
-    name <- getModlName guts
+    name <- getModlNameFrom guts
     liftIO $ mapM_ (writeCFile dflags name) cmmProg
     return srts
     where
@@ -275,7 +277,7 @@ fromCmmTo HscC guts rawCmmpStream = do
 fromCmmTo HscAsm guts rawCmmpStream = do
     uniqSup <- liftIO $ mkSplitUniqSupply 'a'
     dflags <- getSessionDynFlags
-    name <- getModlName guts
+    name <- getModlNameFrom guts
     liftIO $ writeAsmFile dflags name uniqSup rawCmmpStream
     where
         writeAsmFile dflags name uniqSup stream = do
@@ -283,7 +285,7 @@ fromCmmTo HscAsm guts rawCmmpStream = do
             nativeCodeGen dflags (cg_module guts) (mkModLoc name) handle uniqSup stream
 fromCmmTo HscLlvm guts rawCmmpStream = do
     dflags <- getSessionDynFlags
-    name <- getModlName guts
+    name <- getModlNameFrom guts
     liftIO $ writeLlvmFile dflags name rawCmmpStream
     where
         writeLlvmFile dflags name stream = do
@@ -295,9 +297,17 @@ fromCmmTo _ _ rawCmmpStream = do
     (_, srts) <- liftIO $ collect_ rawCmmpStream
     return srts
 
-{- TODO: see CoreLint which just type-checks a Core program (which is naive, since Core has explicit typing). -}
-coreCompUnit :: Module -> HscTarget -> GhcLink -> CoreProgram -> [TyCon] -> [ClsInst] -> IO ()
-coreCompUnit modl trgOpt linkOpt cp tyCons insts =
+type MkIface = Maybe ModIface
+
+eventuallyMkIface :: MkIface -> CgGuts -> Ghc ()
+eventuallyMkIface (Just intfMod) guts = do
+    dflags <- getSessionDynFlags
+    name <- getModlNameFrom guts
+    liftIO $ writeBinIface dflags (name ++ "hi") intfMod
+eventuallyMkIface Nothing _ = return ()
+
+coreCompUnit :: Module -> HscTarget -> GhcLink -> MkIface -> CoreProgram -> [TyCon] -> [ClsInst] -> IO ()
+coreCompUnit modl trgOpt linkOpt intfToMk cp tyCons insts =
     case checkTrgLink trgOpt linkOpt of
         Just err -> do
             print err
@@ -331,9 +341,12 @@ coreCompUnit modl trgOpt linkOpt cp tyCons insts =
                 {- C-- code generation. -}
                 cmmpStream <- fromStgToCmm prepGuts smplStgp ccs
 
-                {- C-- code optimization ad then preparing for code generation. -}
+                {- C-- code optimization and then preparing for code generation. -}
                 optCmmStream <- cmmOptimizer prepGuts cmmpStream
                 rawCmmStream <- cmmPrepare optCmmStream
 
                 fromCmmTo trgOpt prepGuts rawCmmStream
+
+                {- It eventually creates an interface file (.hi file) according to the value of `intfToMk` -}
+                eventuallyMkIface intfToMk prepGuts
                 return ()

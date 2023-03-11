@@ -303,7 +303,7 @@ eventuallyMkIface :: MkIface -> CgGuts -> Ghc ()
 eventuallyMkIface (Just intfMod) guts = do
     dflags <- getSessionDynFlags
     name <- getModlNameFrom guts
-    liftIO $ writeBinIface dflags (name ++ "hi") intfMod
+    liftIO $ writeBinIface dflags (name ++ ".hi") intfMod
 eventuallyMkIface Nothing _ = return ()
 
 coreCompUnit :: Module -> HscTarget -> GhcLink -> MkIface -> CoreProgram -> [TyCon] -> [ClsInst] -> IO ()
